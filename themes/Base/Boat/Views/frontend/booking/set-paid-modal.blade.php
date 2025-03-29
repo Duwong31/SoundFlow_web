@@ -1,0 +1,1 @@
+@include( "Tour::frontend/booking/set-paid-modal" )
