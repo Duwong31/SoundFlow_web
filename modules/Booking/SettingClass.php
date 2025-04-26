@@ -77,41 +77,41 @@ class SettingClass extends BaseSettingsClass
 
                 ]
             ],
-            'enquiry'=>[
-                'id'   => 'enquiry',
-                'title' => __("Enquiry Settings"),
-                'position'=>41,
-                'view'=>"Booking::admin.settings.enquiry",
-                "keys"=>[
-                    'booking_enquiry_for_hotel',
-                    'booking_enquiry_for_tour',
-                    'booking_enquiry_for_space',
-                    'booking_enquiry_for_car',
-                    'booking_enquiry_for_event',
-                    'booking_enquiry_for_boat',
+            // 'enquiry'=>[
+            //     'id'   => 'enquiry',
+            //     'title' => __("Enquiry Settings"),
+            //     'position'=>41,
+            //     'view'=>"Booking::admin.settings.enquiry",
+            //     "keys"=>[
+            //         'booking_enquiry_for_hotel',
+            //         'booking_enquiry_for_tour',
+            //         'booking_enquiry_for_space',
+            //         'booking_enquiry_for_car',
+            //         'booking_enquiry_for_event',
+            //         'booking_enquiry_for_boat',
 
-                    'booking_enquiry_type_hotel',
-                    'booking_enquiry_type_tour',
-                    'booking_enquiry_type_space',
-                    'booking_enquiry_type_car',
-                    'booking_enquiry_type_event',
-                    'booking_enquiry_type_boat',
+            //         'booking_enquiry_type_hotel',
+            //         'booking_enquiry_type_tour',
+            //         'booking_enquiry_type_space',
+            //         'booking_enquiry_type_car',
+            //         'booking_enquiry_type_event',
+            //         'booking_enquiry_type_boat',
 
-                    'booking_enquiry_enable_mail_to_vendor',
-                    'booking_enquiry_mail_to_vendor_content',
+            //         'booking_enquiry_enable_mail_to_vendor',
+            //         'booking_enquiry_mail_to_vendor_content',
 
-                    'booking_enquiry_enable_mail_to_admin',
-                    'booking_enquiry_mail_to_admin_content',
-                    'booking_enquiry_enable_recaptcha',
-                ],
-                'html_keys'=>[
+            //         'booking_enquiry_enable_mail_to_admin',
+            //         'booking_enquiry_mail_to_admin_content',
+            //         'booking_enquiry_enable_recaptcha',
+            //     ],
+            //     'html_keys'=>[
 
-                ],
-                'filter_demo_mode'=>[
-                    'booking_enquiry_mail_to_vendor_content',
-                    'booking_enquiry_mail_to_admin_content',
-                ]
-            ]
+            //     ],
+            //     'filter_demo_mode'=>[
+            //         'booking_enquiry_mail_to_vendor_content',
+            //         'booking_enquiry_mail_to_admin_content',
+            //     ]
+            // ]
         ];
         return apply_filters(Hook::BOOKING_SETTING_CONFIG,$configs);
     }

@@ -20,6 +20,11 @@
                     </div>
                 @endif
                 <div class="form-group">
+                    <label>{{__("Name")}} <span class="text-danger">*</span></label> {{-- Thêm dấu * nếu bắt buộc --}}
+                    <input type="text" required value="{{old('name', $dataUser->name)}}" name="name" placeholder="{{__("Name")}}" class="form-control">
+                    <i class="fa fa-user input-icon"></i>
+                </div>
+                <div class="form-group">
                     <label>{{__("User name")}} <span class="text-danger">*</span></label>
                     <input type="text" required minlength="4" name="user_name" value="{{old('user_name',$dataUser->user_name)}}" placeholder="{{__("User name")}}" class="form-control">
                     <i class="fa fa-user input-icon"></i>

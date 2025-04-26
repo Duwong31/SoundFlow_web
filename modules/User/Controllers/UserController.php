@@ -96,8 +96,10 @@ class UserController extends FrontendController
         $user = Auth::user();
         $messages = [
             'user_name.required'      => __('The User name field is required.'),
+            'name.required' => __('The Name field is required.'),
         ];
         $request->validate([
+            'name' => 'required|string|max:255', 
             'first_name' => 'required|max:255',
             'last_name'  => 'required|max:255',
             'email'      => [

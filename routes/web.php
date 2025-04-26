@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\SpotifyAuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,11 +16,16 @@ use Illuminate\Support\Facades\Route;
 */
 Route::get('/intro', 'LandingpageController@index');
 Route::get('/', 'HomeController@index');
-Route::get('/', function () {
-    return redirect('/admin');
-});
+// Route::get('/', function () {
+//     return redirect('/admin');
+// });
 
 // Route::get('/home', 'HomeController@index')->name('home');
+
+// routes/web.php (hoặc routes/api.php nếu bạn muốn)
+Route::get('/callspotify', [SpotifyAuthController::class, 'tokenSwap']);
+Route::post('/callspotify/refresh', [SpotifyAuthController::class, 'tokenRefresh']);
+
 Route::post('/install/check-db', 'HomeController@checkConnectDatabase');
 
 // Social Login

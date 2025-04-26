@@ -14,7 +14,7 @@
                         @if($logo)
                             <img src="{{$logo}}" alt="{{ setting_item('site_title') }}">
                         @else
-                            <img src="{{ asset('images/logo_otod.svg') }}" style="max-width:200px" alt="{{ setting_item('site_title') }}">
+                            <img src="{{ asset('images/logo_soundflow.png') }}" style="max-width:100px" alt="{{ setting_item('site_title') }}">
                         @endif
                     @endif
                 </a>

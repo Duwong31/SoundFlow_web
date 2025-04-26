@@ -17,7 +17,8 @@ class UserResource extends JsonResource
             }
         }
 
-        $full_name = trim($this->first_name . ' ' . $this->last_name);
+        // $full_name = $this->name ?: trim($this->first_name . ' ' . $this->last_name);
+        $full_name = $this->getDisplayNameAttribute();
 
         return [
             'id' => $this->id,
@@ -26,17 +27,17 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'phone_verified' => (bool)$this->phone_verified,
-            'birth_year' => $birth_year,
-            'gender' => $this->gender,
-            'referral_code' => $this->referral_code,
-            'wallet_balance' => (float)$this->wallet_balance,
-            'points' => (int)$this->points,
-            'rank' => $this->rank,
-            'so_bhxh' => $this->so_bhxh,
-            'facebook_linked' => !empty($this->facebook_id),
-            'tiktok_linked' => !empty($this->tiktok_id),
-            'current_address' => $this->address,
-            'company' => $this->business_name,
+            // 'birth_year' => $birth_year,
+            // 'gender' => $this->gender,
+            // 'referral_code' => $this->referral_code,
+            // 'wallet_balance' => (float)$this->wallet_balance,
+            // 'points' => (int)$this->points,
+            // 'rank' => $this->rank,
+            // 'so_bhxh' => $this->so_bhxh,
+            // 'facebook_linked' => !empty($this->facebook_id),
+            // 'tiktok_linked' => !empty($this->tiktok_id),
+            // 'current_address' => $this->address,
+            // 'company' => $this->business_name,
             'active_status' => (bool)$this->active_status,
             'dark_mode' => (bool)$this->dark_mode,
             'messenger_color' => $this->messenger_color,

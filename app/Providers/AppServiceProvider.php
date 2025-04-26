@@ -75,6 +75,14 @@ class AppServiceProvider extends ServiceProvider
         if(auth()->id() and !auth()->check()){
             auth()->logout();
         }
+
+        \DB::listen(function ($query) {
+            \Log::info(
+                $query->sql,
+                $query->bindings,
+                $query->time
+            );
+        });
     }
 
     protected function initConfigFromDB(){

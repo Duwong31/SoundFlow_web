@@ -4,6 +4,8 @@ namespace Modules\User\Models;
 use Modules\Agency\Models\Agency;
 use Modules\Agency\Models\AgencyAgent;
 use Modules\User\Traits\HasRank;
+use Modules\Media\Models\MediaFile; 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class User extends \App\User
 {
@@ -75,5 +77,29 @@ class User extends \App\User
     {
         \Log::info('Getting rank for user with points: ' . $this->points);
         return $this->calculateRank();
+    }
+
+    public function avatar(): BelongsTo
+    {
+        // Sử dụng lớp MediaFile và khóa ngoại avatar_id
+        // withDefault trả về một đối tượng MediaFile rỗng nếu không tìm thấy
+        // để tránh lỗi khi truy cập thuộc tính của $user->avatar
+        return $this->belongsTo(MediaFile::class, 'avatar_id', 'id')->withDefault();
+    }
+
+     /**
+     * Lấy URL của avatar, sử dụng FileHelper
+     *
+     * @param string $size Kích thước mong muốn (ví dụ: 'thumb', 'medium')
+     * @return string|false URL của avatar hoặc false nếu không có
+     */
+    public function getAvatarUrlAttribute(string $size = 'thumb')
+    {
+        if ($this->avatar_id) {
+            return \Modules\Media\Helpers\FileHelper::url($this->avatar_id, $size);
+        }
+        // Trả về URL avatar mặc định nếu cần
+        // return asset('images/default-avatar.png');
+        return false; // Hoặc null
     }
 }

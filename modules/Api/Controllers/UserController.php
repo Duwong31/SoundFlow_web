@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Controller;
 use Modules\Booking\Models\Booking;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Modules\Location\Models\Location;
 use Modules\User\Models\UserWishList;
 use Modules\Booking\Events\BookingUpdatedEvent;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\App;
 use Illuminate\Contracts\Translation\Translator;
 use Modules\Booking\Events\BookingCancelledEvent;
+use Illuminate\Support\Facades\Cache;
+
 
 class UserController extends Controller
 {
@@ -225,4 +228,100 @@ class UserController extends Controller
             'status' => $booking->status
         ]);
     }
+
+    public function updateProfile(Request $request)
+{
+    /** @var \App\User $user */
+    $user = Auth::user();
+
+    if (!$user) {
+        return $this->sendError('Unauthenticated.', [], 401);
+    }
+
+    // --- Validation ---
+    $validator = Validator::make($request->all(), [
+        'name' => 'sometimes|string|max:255',
+        'avatar_id' => [ // Validate avatar_id
+            'nullable', // Cho phép gán avatar_id = null (xóa avatar)
+            'integer',
+            // Đảm bảo ID tồn tại trong bảng media_files
+            Rule::exists('media_files', 'id')->where(function ($query) {
+                // Tùy chọn: Thêm điều kiện khác nếu cần (vd: type='image')
+            }),
+        ],
+         // Thêm validation cho các trường khác nếu muốn cập nhật chúng
+    ]);
+     if ($validator->fails()) {
+        return $this->sendError('Validation Error.', ['errors' => $validator->errors()], 422);
+    }
+
+    // --- Update Logic ---
+    $input = $validator->validated();
+    $profileUpdated = false;
+
+    // Gán giá trị MỚI và đánh dấu là cần cập nhật
+    if (isset($input['name'])) {
+        $newName = trim($input['name']);
+        $nameParts = explode(' ', $newName, 2);
+        $newFirstName = $nameParts[0];
+        $newLastName = $nameParts[1] ?? '';
+
+        // Gán giá trị mới BẤT KỂ có khác giá trị cũ hay không
+        $user->name = $newName;
+        $user->first_name = $newFirstName;
+        $user->last_name = $newLastName;
+        $profileUpdated = true; // Đánh dấu là có thay đổi để thực hiện save
+    }
+    if (array_key_exists('avatar_id', $input)) {
+        if ($user->avatar_id !== $input['avatar_id']) { // Kiểm tra nếu ID thay đổi
+            $user->avatar_id = $input['avatar_id']; // Gán ID mới (có thể là null)
+            $profileUpdated = true;
+        }
+    }
+    // Xử lý các trường khác tương tự nếu có (gán trực tiếp)
+    // Ví dụ:
+    // if (isset($input['bio'])) {
+    //    $user->bio = clean($input['bio']);
+    //    $profileUpdated = true; // Chỉ set true nếu thực sự có input['bio']
+    // }
+
+
+    if ($profileUpdated) {
+         // Log TRƯỚC KHI SAVE để kiểm tra giá trị gán
+        \Log::info("User object state JUST BEFORE save():");
+        \Log::info("User Name: " . $user->name);
+        \Log::info("User First Name: " . $user->first_name);
+        \Log::info("User Last Name: " . $user->last_name);
+
+        try {
+            $user->save(); // Lưu tất cả thay đổi
+
+            // ---- KHÔNG CẦN REFRESH NỮA ----
+            // $user->refresh(); // Bỏ dòng này đi vì đối tượng $user đã đúng
+
+            // ---- XÓA CACHE (VẪN NÊN GIỮ) ----
+            Cache::forget('user_data_' . $user->id);
+            \Log::info("Cache file potentially cleared for user ID: " . $user->id);
+            // ---- KẾT THÚC XÓA CACHE ----
+
+
+            // Log SAU KHI SAVE để kiểm tra lần cuối
+            \Log::info("User object state AFTER save():");
+            \Log::info("User Name: " . $user->name);
+            \Log::info("User First Name: " . $user->first_name);
+            \Log::info("User Last Name: " . $user->last_name);
+
+            return $this->sendSuccess([
+                'data' => new \Modules\User\Resources\UserResource($user), // Dùng đối tượng $user hiện tại
+                'message' => __('Profile updated successfully')
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('API Profile Update Error: ' . $e->getMessage());
+            return $this->sendError(__('Failed to update profile.'), [], 500);
+        }
+    } else {
+        // ... (response không thay đổi) ...
+    }
+}
 }

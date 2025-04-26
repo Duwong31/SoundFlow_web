@@ -127,7 +127,7 @@ class FormSearchAllService extends BaseBlock
     {
         $model['bg_image_url'] = FileHelper::url($model['bg_image'] ?? "", 'full') ?? "";
         $model['list_location'] = $model['tour_location'] = Location::where("status", "publish")->limit(1000)->with(['translation'])->get()->toTree();
-        $model['tour_category'] = TourCategory::where('status', 'publish')->with(['translation'])->get()->toTree();
+        // $model['tour_category'] = TourCategory::where('status', 'publish')->with(['translation'])->get()->toTree();
         $model['style'] = $model['style'] ?? "";
         $model['list_slider'] = $model['list_slider'] ?? "";
         $model['modelBlock'] = $model;

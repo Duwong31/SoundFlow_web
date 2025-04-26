@@ -25,6 +25,7 @@ use Illuminate\Support\Str;
 use Modules\Sms\Core\Facade\Sms;
 use Illuminate\Support\Facades\DB;
 use Modules\User\Models\User as ModulesUser;
+use Modules\User\Emails\ResetPasswordOtpEmail;
 class AuthController extends Controller
 {
     /**
@@ -52,7 +53,9 @@ class AuthController extends Controller
                 'forgotPassword',
                 'resetPassword',
                 'verifyPhoneOTP',
-                'resendOTP'
+                'resendOTP',
+                'forgotPasswordEmail', 
+                'resetPasswordEmail',
             ]
         ]);
 
@@ -81,7 +84,7 @@ class AuthController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'phone' => 'required',
+            'email' => 'required',
             'password' => 'required',
             'device_name' => 'required',
         ]);
@@ -92,8 +95,8 @@ class AuthController extends Controller
             if ($errors->has('password')) {
                 return $this->sendError('required_password');
             }
-            if ($errors->has('phone')) {
-                return $this->sendError('required_phone');
+            if ($errors->has('email')) {
+                return $this->sendError('required_email');
             }
             if ($errors->has('device_name')) {
                 return $this->sendError('required_device');
@@ -101,15 +104,24 @@ class AuthController extends Controller
         }
 
         // Validate phone number format
-        $phone = $request->phone;
-        if (!preg_match('/^\+84\d{9}$/', $phone)) {
-            return $this->sendError('invalid_phone');
-        }
+        // $phone = $request->phone;
+        // if (!preg_match('/^\+84\d{9}$/', $phone)) {
+        //     return $this->sendError('invalid_phone');
+        // }
 
-        $user = User::where('phone', $request->phone)->first();
+        // $user = User::where('phone', $request->phone)->first();
 
+        // if (!$user || !Hash::check($request->password, $user->password)) {
+        //     return $this->sendError('invalid_credentials');
+        // }
+
+        $user = User::where('email', $request->email)->first(); // Find user by email
+
+
+        // --- Password Check and Response ---
+        // This part is fine, assuming the user was found correctly above
         if (!$user || !Hash::check($request->password, $user->password)) {
-            return $this->sendError('invalid_credentials');
+            return $this->sendError('invalid_credentials'); 
         }
 
         return $this->sendSuccess([
@@ -307,10 +319,10 @@ class AuthController extends Controller
                     
                     $response = SmsHelper::send($request->phone, $otp, $zaloSetting->zalo_access_token);
                     if (isset($response->error) && $response->error !== 0) {
-                        \Log::channel('sms')->error("SMS sending failed: " . json_encode($response));
+                        Log::channel('sms')->error("SMS sending failed: " . json_encode($response));
                     }
                 } catch (\Exception $e) {
-                    \Log::channel('sms')->error("SMS sending failed: " . $e->getMessage());
+                    Log::channel('sms')->error("SMS sending failed: " . $e->getMessage());
                 }
             }
 
@@ -338,12 +350,17 @@ class AuthController extends Controller
         }
 
         $rules = [
-            'first_name' => [
-                'required',
-                'string',
-                'max:255'
-            ],
-            'last_name' => [
+            // 'first_name' => [
+            //     'required',
+            //     'string',
+            //     'max:255'
+            // ],
+            // 'last_name' => [
+            //     'required',
+            //     'string',
+            //     'max:255'
+            // ],
+            'name' =>[
                 'required',
                 'string',
                 'max:255'
@@ -359,16 +376,17 @@ class AuthController extends Controller
                 'required',
                 'string'
             ],
-            'term' => ['required'],
+            // 'term' => ['required'],
         ];
 
         $messages = [
+            'name.required' => __('Vui lòng nhập tên của bạn'),
             'email.required' => __('Email is required'),
             'email.email' => __('Email is invalid'),
             'password.required' => __('Password is required'),
-            'first_name.required' => __('The first name is required'),
-            'last_name.required' => __('The last name is required'),
-            'term.required' => __('The terms and conditions field is required'),
+            // 'first_name.required' => __('The first name is required'),
+            // 'last_name.required' => __('The last name is required'),
+            // 'term.required' => __('The terms and conditions field is required'),
         ];
 
         $validator = Validator::make($request->all(), $rules, $messages);
@@ -377,12 +395,13 @@ class AuthController extends Controller
         }
 
         $user = \App\User::create([
-            'first_name' => $request->input('first_name'),
-            'last_name' => $request->input('last_name'),
+            // 'first_name' => $request->input('first_name'),
+            // 'last_name' => $request->input('last_name'),
+            'name' => $request->input('name'),
             'email' => $request->input('email'),
             'password' => Hash::make($request->input('password')),
             'publish' => $request->input('publish'),
-            'phone' => $request->input('phone'),
+            // 'phone' => $request->input('phone'),
         ]);
 
         event(new Registered($user));
@@ -682,7 +701,184 @@ class AuthController extends Controller
             return $this->sendError($e->getMessage());
         }
     }
+    public function forgotPasswordEmail(Request $request)
+    {
+        $rules = [
+            'email' => 'required|email|exists:users,email', // Giữ nguyên validation
+        ];
 
+        $messages = [
+            'email.required' => 'required_email',
+            'email.email' => 'invalid_email_format',
+            'email.exists' => 'email_not_found', // Giữ nguyên lỗi tùy chỉnh
+        ];
+
+        $validator = Validator::make($request->all(), $rules, $messages);
+
+        if ($validator->fails()) {
+            $errors = $validator->errors();
+            if ($errors->has('email')) {
+                if ($errors->first('email') === 'email_not_found') {
+                    return $this->sendError('email_not_found');
+                }
+                 if ($errors->first('email') === 'invalid_email_format') {
+                    return $this->sendError('invalid_email_format');
+                }
+                return $this->sendError('required_email');
+            }
+            return $this->sendError('validation_error', ['errors' => $validator->errors()->toArray()]);
+        }
+
+        // --- Rate Limiting (Giữ hoặc comment tùy nhu cầu test) ---
+        // list($exceeded, $count) = $this->EmailOtpLimitDay($request->email);
+        // if ($exceeded) {
+        //     return response()->json([
+        //         'status' => 0,
+        //         'message' => __('Bạn đã gửi yêu cầu OTP qua email quá 3 lần trong 24 giờ. Vui lòng thử lại vào ngày mai.')
+        //     ], 429);
+        // }
+        // --- End Rate Limiting ---
+
+        $user = User::where('email', $request->email)->first();
+        // Validation đã đảm bảo user tồn tại
+        if (!$user) {
+            // Dòng này không nên được chạy tới nếu validation hoạt động
+            return $this->sendError('email_not_found');
+        }
+
+        // --- CHẾ ĐỘ TẠM THỜI: BỎ QUA VIỆC GỬI MAIL THỰC TẾ ---
+        try {
+            // Tạo OTP giả hoặc cố định để lưu vào meta (tùy chọn, có thể không cần nếu màn OTP dùng mã cứng)
+            $otp = '123456'; // Mã OTP cố định cho mục đích test
+
+            // Lưu OTP *cố định* vào user meta (để hàm resetPasswordEmail có thể kiểm tra nếu cần)
+            $user->addMeta('email_reset_otp', $otp);
+            $user->addMeta('email_reset_otp_timestamp', Carbon::now()->format('Y-m-d H:i:s'));
+
+            // --- Cập nhật bộ đếm OTP Email (Giữ hoặc comment tùy nhu cầu test) ---
+            // $this->updateEmailOtpRequestCounter($request->email);
+            // --- End Update Counter ---
+
+            // --- VÔ HIỆU HÓA GỬI EMAIL ---
+            /*
+            // Khối try...catch gốc để gửi mail
+            try {
+                 // Ensure MAIL_* variables are set in your .env file
+                Mail::to($user->email)->send(new ResetPasswordOtpEmail($otp, $user)); // Pass OTP and user if needed in email template
+                Log::info("Password reset OTP email sent to: " . $user->email);
+            } catch (\Exception $e) {
+                 Log::error("Failed to send password reset OTP email to {$user->email}: " . $e->getMessage());
+                 // Trong chế độ tạm thời, chúng ta bỏ qua lỗi gửi mail này và vẫn tiếp tục
+                 // return $this->sendError('mail_send_failed'); // KHÔNG trả về lỗi ở đây trong chế độ tạm thời
+                 Log::warning("TEMP MODE: Ignored mail sending failure for {$user->email}: " . $e->getMessage());
+            }
+            */
+            // Ghi log thay thế cho việc gửi mail
+            Log::info("TEMP MODE: Skipped sending password reset OTP email to: " . $user->email . " (OTP would be: " . $otp . ")");
+            // --- KẾT THÚC VÔ HIỆU HÓA GỬI EMAIL ---
+
+            // Trả về response thành công, báo rằng email tồn tại và gửi user_id
+            // Flutter sẽ dùng user_id này và chuyển sang màn hình OTP
+            return $this->sendSuccess([
+                // Có thể dùng message khác để biết là đang ở chế độ test
+                'message' => __('auth.email_exists_proceed_to_otp'), // Thêm translation key này nếu muốn
+                'user_id' => $user->id,
+                 // Bạn có thể bỏ dòng otp này nếu Flutter tự biết dùng '123456'
+                // 'test_otp' => $otp
+            ]);
+
+        } catch (\Exception $e) {
+            // Bắt các lỗi không mong muốn khác (ví dụ: lỗi khi lưu meta)
+            Log::error("Error during forgotPasswordEmail (TEMP MODE) for {$request->email}: " . $e->getMessage());
+            return $this->sendError('server_error'); // Lỗi server chung
+        }
+        // --- KẾT THÚC CHẾ ĐỘ TẠM THỜI ---
+    }
+
+    // public function forgotPasswordEmail(Request $request)
+    // {
+    //     $rules = [
+    //         'email' => 'required|email|exists:users,email', // Ensure email exists
+    //     ];
+
+    //     $messages = [
+    //         'email.required' => 'required_email',
+    //         'email.email' => 'invalid_email_format',
+    //         'email.exists' => 'email_not_found', // Custom error for non-existent email
+    //     ];
+
+    //     $validator = Validator::make($request->all(), $rules, $messages);
+
+    //     if ($validator->fails()) {
+    //         $errors = $validator->errors();
+    //         if ($errors->has('email')) {
+    //              // Prioritize specific errors
+    //             if ($errors->first('email') === 'email_not_found') {
+    //                 return $this->sendError('email_not_found');
+    //             }
+    //              if ($errors->first('email') === 'invalid_email_format') {
+    //                 return $this->sendError('invalid_email_format');
+    //             }
+    //             return $this->sendError('required_email'); 
+    //         }
+    //         return $this->sendError('validation_error', ['errors' => $validator->errors()->toArray()]);
+    //     }
+    // // --- Rate Limiting (Adapt from phone OTP logic) ---
+    //     // You should implement similar rate limiting for email to prevent abuse
+    //     // Example (you'll need to create these helper methods):
+    //     // list($exceeded, $count) = $this->EmailOtpLimitDay($request->email);
+    //     // if ($exceeded) {
+    //     //     return response()->json([
+    //     //         'status' => 0,
+    //     //         'message' => __('Bạn đã gửi yêu cầu OTP qua email quá 3 lần trong 24 giờ. Vui lòng thử lại vào ngày mai.')
+    //     //     ], 429); // 429 Too Many Requests
+    //     // }
+    //     // --- End Rate Limiting ---
+
+    //     $user = User::where('email', $request->email)->first();
+    //     // Check again just in case (though 'exists' rule should cover it)
+    //     if (!$user) {
+    //         return $this->sendError('email_not_found');
+    //     }
+
+    //     // Generate OTP
+    //     try {
+    //         $otp = (string) rand(100000, 999999); // Simple 6-digit OTP
+
+    //         // Store OTP in user meta (using different keys than phone OTP)
+    //         $user->addMeta('email_reset_otp', $otp);
+    //         $user->addMeta('email_reset_otp_timestamp', Carbon::now()->format('Y-m-d H:i:s'));
+
+    //         // --- Update Email OTP Request Counter (Adapt from phone) ---
+    //         // $this->updateEmailOtpRequestCounter($request->email);
+    //         // --- End Update Counter ---
+
+    //         // --- Send Email ---
+    //         try {
+    //              // Ensure MAIL_* variables are set in your .env file
+    //             Mail::to($user->email)->send(new ResetPasswordOtpEmail($otp, $user)); // Pass OTP and user if needed in email template
+    //             Log::info("Password reset OTP email sent to: " . $user->email); 
+    //         } catch (\Exception $e) {
+    //              Log::error("Failed to send password reset OTP email to {$user->email}: " . $e->getMessage());
+    //              // Don't necessarily reveal failure details to the user, but log it
+    //              // Maybe return a generic error, or proceed but log the mail failure
+    //              // For critical OTPs, failing here might warrant an error response:
+    //              return $this->sendError('mail_send_failed'); // Add this error code to your sendError handler
+    //         }
+    //         // --- End Send Email ---
+
+    //         // Return success response *without* the OTP for security
+    //         return $this->sendSuccess([
+    //             'message' => __('auth.otp_sent_to_email'), // Add this translation key
+    //             'user_id' => $user->id, // Send user_id if needed by the frontend flow
+    //             // 'otp' => $otp // DO NOT SEND OTP IN RESPONSE FOR EMAIL
+    //         ]);
+
+    //     } catch (\Exception $e) {
+    //         Log::error("Error during forgotPasswordEmail for {$request->email}: " . $e->getMessage());
+    //         return $this->sendError('server_error'); // Generic server error
+    //     }
+    // }
     public function resetPassword(Request $request)
     {
         // Check if request is empty
@@ -696,7 +892,7 @@ class AuthController extends Controller
                 'string',
                 'regex:/^\+84[0-9]{9}$/'
             ],
-            'otp' => 'required',
+            // 'otp' => 'required',
             'password' => [
                 'required',
                 'string',
@@ -708,7 +904,7 @@ class AuthController extends Controller
         $messages = [
             'phone.required' => 'required_phone',
             'phone.regex' => 'invalid_phone',
-            'otp.required' => 'required_otp',
+            // 'otp.required' => 'required_otp',
             'password.required' => 'required_password',
             'password.confirmed' => 'password_not_match',
             'password.regex' => 'password_format'
@@ -726,9 +922,9 @@ class AuthController extends Controller
                 return $this->sendError('invalid_phone');
             }
 
-            if ($errors->has('otp')) {
-                return $this->sendError('required_otp');
-            }
+            // if ($errors->has('otp')) {
+            //     return $this->sendError('required_otp');
+            // }
 
             if ($errors->has('password')) {
                 if (!$request->password) {
@@ -748,26 +944,26 @@ class AuthController extends Controller
             return $this->sendError('user_not_found');
         }
 
-        $storedOTP = $user->getMeta('phone_verify_code');
-        $otpTimestamp = $user->getMeta('phone_verify_code_timestamp');
+        // $storedOTP = $user->getMeta('phone_verify_code');
+        // $otpTimestamp = $user->getMeta('phone_verify_code_timestamp');
 
-        if (!$storedOTP) {
-            return $this->sendError('invalid_otp');
-        }
+        // if (!$storedOTP) {
+        //     return $this->sendError('invalid_otp');
+        // }
 
-        // Check if OTP is expired (after 5 minutes)
-        try {
-            $otpTime = Carbon::parse($otpTimestamp);
-            if (Carbon::now()->diffInMinutes($otpTime) > 5) {
-                return $this->sendError('otp_expired');
-            }
-        } catch (\Exception $e) {
-            return $this->sendError('invalid_otp');
-        }
+        // // Check if OTP is expired (after 5 minutes)
+        // try {
+        //     $otpTime = Carbon::parse($otpTimestamp);
+        //     if (Carbon::now()->diffInMinutes($otpTime) > 5) {
+        //         return $this->sendError('otp_expired');
+        //     }
+        // } catch (\Exception $e) {
+        //     return $this->sendError('invalid_otp');
+        // }
 
-        if ($storedOTP != $request->otp) {
-            return $this->sendError('invalid_otp');
-        }
+        // if ($storedOTP != $request->otp) {
+        //     return $this->sendError('invalid_otp');
+        // }
 
         $user->password = Hash::make($request->password);
         $user->save();
@@ -779,7 +975,114 @@ class AuthController extends Controller
         return $this->sendSuccess(['message' => __('auth.password_reset_success')]);
     }
 
+    public function resetPasswordEmail(Request $request)
+    {
+        // Check if request is empty
+        if (empty($request->all())) {
+            return $this->sendError('empty_data');
+        }
 
+        $rules = [
+            'email' => 'required|email|exists:users,email',
+            // 'otp' => 'required|string|digits:6', 
+            'password' => [
+                'required',
+                'string',
+                'confirmed', // Requires 'password_confirmation' field in request
+                // Consider keeping the same regex as your other password fields
+                'regex:/^(?=.*[A-Z])(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{6,}$/'
+            ]
+        ];
+
+        $messages = [
+            'email.required' => 'required_email',
+            'email.email' => 'invalid_email_format',
+            'email.exists' => 'email_not_found', // Should not happen if OTP was sent, but good check
+            // 'otp.required' => 'required_otp',
+            // 'otp.digits' => 'invalid_otp_format',
+            'password.required' => 'required_password',
+            'password.confirmed' => 'password_not_match',
+            'password.regex' => 'password_format'
+            // Add other messages as needed
+        ];
+
+        $validator = Validator::make($request->all(), $rules, $messages);
+
+        if ($validator->fails()) {
+            $errors = $validator->errors();
+            // Provide specific feedback based on validation errors
+            if ($errors->has('email')) return $this->sendError($errors->first('email'));
+            // if ($errors->has('otp')) return $this->sendError($errors->first('otp'));
+            if ($errors->has('password')) return $this->sendError($errors->first('password'));
+            // Fallback
+            return $this->sendError('validation_error', ['errors' => $validator->errors()->toArray()]);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        if (!$user) {
+             // Should be caught by validation, but double-check
+            return $this->sendError('email_not_found');
+        }
+
+        // --- Validate OTP ---
+        // $storedOTP = $user->getMeta('email_reset_otp');
+        // $otpTimestamp = $user->getMeta('email_reset_otp_timestamp');
+
+        // if (!$storedOTP || !$otpTimestamp) {
+        //     Log::warning("No OTP found for email reset attempt: " . $request->email);
+        //     return $this->sendError('invalid_otp'); // Or 'otp_expired' if you prefer generic
+        // }
+
+        // // Check OTP expiry (e.g., 10 minutes)
+        // try {
+        //     $otpTime = Carbon::parse($otpTimestamp);
+        //     if (Carbon::now()->diffInMinutes($otpTime) > 10) { // Adjust expiry time as needed
+        //         Log::warning("Expired OTP used for email reset attempt: " . $request->email);
+        //         // Optionally clear the expired OTP here
+        //         // $user->deleteMeta('email_reset_otp');
+        //         // $user->deleteMeta('email_reset_otp_timestamp');
+        //         return $this->sendError('otp_expired');
+        //     }
+        // } catch (\Exception $e) {
+        //     Log::error("Error parsing OTP timestamp for {$request->email}: " . $e->getMessage());
+        //     return $this->sendError('invalid_otp'); // Treat parsing error as invalid
+        // }
+
+        // // Check OTP match
+        // if ($storedOTP != $request->otp) {
+        //     Log::warning("Invalid OTP used for email reset attempt: " . $request->email);
+        //     // Consider adding attempt tracking here to lock accounts after too many failures
+        //     return $this->sendError('invalid_otp');
+        // }
+        // --- End OTP Validation ---
+
+
+        // --- Reset Password ---
+        try {
+            $user->password = Hash::make($request->password);
+            // Optional: Mark email as verified if it wasn't already (though usually registered users have verified emails)
+            // $user->email_verified_at = now();
+            $user->save();
+
+            // --- IMPORTANT: Invalidate the used OTP ---
+            $user->deleteMeta('email_reset_otp');
+            $user->deleteMeta('email_reset_otp_timestamp');
+            // Optional: Also clear the rate limit counter upon success
+            // $user->deleteMeta('email_otp_request_count_24h');
+
+            Log::info("Password successfully reset via email OTP for: " . $request->email);
+
+            // Don't usually log the user in or return tokens here.
+            // Force them to log in again with the new password.
+            return $this->sendSuccess(['message' => __('auth.password_reset_success')]);
+
+        } catch (\Exception $e) {
+            Log::error("Error saving new password for {$request->email}: " . $e->getMessage());
+            return $this->sendError('server_error');
+        }
+        // --- End Reset Password ---
+    }
+    
     // OTP verification
     public function verifyPhoneOtp(Request $request)
     {

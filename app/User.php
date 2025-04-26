@@ -261,9 +261,9 @@ class User extends Authenticatable implements MustVerifyEmail
     public static function boot()
     {
         parent::boot();
-        static::saving(function ($table) {
-            $table->name = implode(' ', [$table->first_name, $table->last_name]);
-        });
+        // static::saving(function ($table) {
+        //     $table->name = implode(' ', [$table->first_name, $table->last_name]);
+        // });
     }
 
     //        public function vendorPlan()
