@@ -1,12 +1,13 @@
 <?php
 
 use Illuminate\Http\Request;
-use \Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Route;
 use Modules\Api\Controllers\LifestyleController;
 use Modules\Api\Controllers\CarBrandController;
 use Modules\Api\Controllers\CarLocationController;
 use Modules\Api\Controllers\FeeController;
 use Modules\Api\Controllers\PlaylistController;
+use Modules\Api\Controllers\UserFavoriteController;
 
 /*
 |--------------------------------------------------------------------------
@@ -21,6 +22,8 @@ use Modules\Api\Controllers\PlaylistController;
 
 Route::post('forgot-password', 'AuthController@forgotPassword')->name('api.forgot-password');
 Route::post('reset-password', 'AuthController@resetPassword')->name('api.reset-password');
+Route::post('/booking/do-checkout', [BookingController::class, 'doCheckout'])
+     ->name('api.booking.doCheckout');
 
 /* Register - Login */
 Route::group(['middleware' => 'api', 'prefix' => 'auth'], function ($router) {
@@ -71,6 +74,17 @@ Route::group(['middleware' => 'auth:sanctum'], function() {
     ->name('api.playlists.destroy')
     ->where('playlist', '[0-9]+');
 });
+
+
+/*Favorite*/
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/favorites', [UserFavoriteController::class, 'index']);
+    Route::post('/favorites', [UserFavoriteController::class, 'store']);
+    Route::delete('/favorites/{songId}', [UserFavoriteController::class, 'destroy']);
+});
+
+
+
 
 
 
